@@ -1,0 +1,26 @@
+---
+# tasks file for samba_setup
+- name: Install Samba server
+  dnf:
+    name: samba
+    state: present
+
+- name: Create Samba share directory
+  file:
+    path: "{{ samba_share_path }}"
+    state: directory
+    mode: '0755'
+    owner: nobody
+    group: nobody
+
+- name: Set SELinux context for Samba share directory
+  command: semanage fcontext -a -t samba_share_t {{ samba_share_path }}
+  become: true
+  notify: SELinux file context for Samba share
+  ignore_errors: true
+
+- name: Create Samba configuration file
+  template:
+    src: smb.conf.j2
+    dest: /etc/samba/smb.conf
+  notify: restart samba

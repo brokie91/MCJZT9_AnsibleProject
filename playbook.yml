@@ -1,0 +1,68 @@
+---
+- name: Configure Samba server and firewall
+  hosts: filesharing 
+  become: true
+
+  vars:
+    samba_share_path: /srv/samba/share
+    allowed_services:
+      - ssh
+      - samba
+    allowed_ports:
+      - 4312
+    firewall_zone_name: testzone
+
+  roles:
+    - samba_setup
+
+  tasks:
+    - name: "Create a new firewall zone named {{ firewall_zone_name }}"
+      firewalld:
+        zone: "{{ firewall_zone_name }}"
+        state: present
+        permanent: true
+
+    - name: "Set default firewall policy on zone {{ firewall_zone_name }} to reject"
+      firewalld:
+        zone: "{{ firewall_zone_name }}"
+        rich_rule: 'rule family="ipv4" source address="0.0.0.0" reject'
+        permanent: true
+        state: enabled
+
+    - name: Add allowed service to firewall
+      firewalld:
+        zone: "{{ firewall_zone_name }}"
+        service: "{{ item }}"
+        permanent: true
+        state: enabled
+      loop: "{{ allowed_services }}"
+
+    - name: Add allowed ports to firewall
+      firewalld:
+        zone: "{{ firewall_zone_name }}"
+        port: "{{ item }}/tcp"
+        permanent: true
+        state: enabled
+      loop: "{{ allowed_ports }}"
+
+    - name: Ensuring /data directory exists
+      file:
+        path: /data
+        state: directory
+
+    - name: Mount student home directory to /data
+      mount:
+        path: /data
+        src: /home/student
+        fstype: auto
+        state: mounted
+        opts: defaults
+      become: true
+
+    - name: Add entry to /etc/fstab for student home directory mount
+      lineinfile:
+        path: /etc/fstab
+        line: "/vda4 /data auto defaults 0 0"
+        create: yes
+      become: true
+
